@@ -10,8 +10,6 @@ rescale <-
   isPresent <- sapply(arg, function(arg) !is.null(m[[arg]]))
   if(sum(isPresent) != 1)
     stop("One and only one of pc, pd and d.prime should be given")
-  # if(double == TRUE && method == "tetrad")
-  #   stop("The double method for the tetrat test is not implemented. Choose double=FALSE")
   method <- match.arg(method)
   if(double)
     Pguess <- pc0 <- ifelse(method %in% c("duotrio", "twoAFC"), 1/4, 1/9)

@@ -49,8 +49,6 @@ discrim <-
             length(total) == 1L, is.numeric(total),
             length(conf.level) == 1L, is.numeric(conf.level),
             conf.level >= 0, conf.level <= 1)
-  # if(double == TRUE && method == "tetrad")
-  #   stop("The double method for the tetrat test is not implemented. Choose double=FALSE")
   m <- match.call(expand.dots=FALSE)
   method <- match.arg(method)
   test <- match.arg(test)

@@ -116,8 +116,6 @@ d.primePwr <-
                 d.primeA >= 0)
     stopifnot(length(d.prime0) == 1 && is.numeric(d.prime0) &&
                 d.prime0 >= 0)
-    # if(double == TRUE && method == "tetrad")
-    #   stop("The double method for the tetrat test is not implemented. Choose double=FALSE")
     pdA <- coef(rescale(d.prime = d.primeA, method = method, double = double))$pd
     pd0 <- coef(rescale(d.prime = d.prime0, method = method, double = double))$pd
     newCall$method <- newCall$d.primeA <- newCall$d.prime0 <- newCall$double <- NULL
@@ -128,7 +126,6 @@ d.primePwr <-
     newCall$pdA <- pdA
     newCall$pd0 <- pd0
     newCall[[1]] <- as.name("discrimPwr")
-    newCall$pd0
     return(eval.parent(newCall))
   }
 
