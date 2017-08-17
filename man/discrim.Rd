@@ -8,15 +8,15 @@
   Computes the probability of a correct answer (Pc), the probability of
   discrimination (Pd) and d-prime, their standard errors, confidence
   intervals and a p-value of a difference or similarity test for one of
-  the four common discrimination protocols.
+  the four conventional or double common discrimination protocols.
 }
 \usage{
 
 discrim(correct, total, d.prime0, pd0, conf.level = 0.95,
            method = c("duotrio", "tetrad", "threeAFC", "twoAFC",
-             "triangle"),
+             "triangle"), double = FALSE,
            statistic = c("exact", "likelihood", "score", "Wald"),
-           test = c("difference", "similarity"), ...)
+           test = c("difference", "similarity"),  ...)
 
 \method{print}{discrim}(x, digits = max(3, getOption("digits")-3), ...)
 
@@ -55,6 +55,7 @@ discrim(correct, total, d.prime0, pd0, conf.level = 0.95,
   \item{conf.level}{the confidence level for the confidence intervals}
   \item{method}{the discrimination protocol. Five allowed values:
     "twoAFC", "threeAFC", "duotrio", "tetrad", "triangle"}
+  \item{double}{logical, is a double discrimination protocol used?}
   \item{test}{the type of test}
   \item{statistic}{the statistic to be used for hypothesis testing and
     confidence intervals}
@@ -96,7 +97,8 @@ discrim(correct, total, d.prime0, pd0, conf.level = 0.95,
   from Wilson's score interval, and the p-value for the hypothesis
   test is based on Pearson's chi-square test,
   cf. \code{\link{prop.test}}.
-
+  
+  For \code{double = "TRUE"}, all estimates are calculated with the psychometric function corresponding to the double discrimination protocol selected.
 }
 \value{
   An object of class \code{discrim} with elements
@@ -125,6 +127,7 @@ discrim(correct, total, d.prime0, pd0, conf.level = 0.95,
     p-value}
   \item{profile}{for \code{statistic == "likelihood"} the profile
     likelihood on the scale of Pc}
+  \item{double}{indicates if the discrimination protocol is conventional or double}
 }
 \references{Brockhoff, P.B. and Christensen, R.H.B (2010). Thurstonian
   models for sensory discrimination tests as generalized linear models.
@@ -143,12 +146,17 @@ discrim(correct, total, d.prime0, pd0, conf.level = 0.95,
 }
 
 \examples{
-## Running the simple discrimination (difference) tests:
+## Running the conventional discrimination (difference) tests:
 discrim(10, 15, method = "twoAFC")
 discrim(10, 15, method = "threeAFC", statistic = "likelihood")
 discrim(10, 15, method = "tetrad", statistic = "likelihood")
 discrim(10, 15, method = "duotrio", conf.level = 0.90)
 discrim(10, 15, method = "triangle", statistic = "score")
+
+## Running some double discrimination examples:
+discrim(10, 15, method = "duotrio", double = TRUE)
+discrim(10, 15, method = "threeAFC", double = TRUE)
+discrim(10, 15, method = "twoAFC", double = TRUE)
 
 ## plot the distributions of sensory intensity:
 m1 <- discrim(10, 15, method = "twoAFC")
@@ -156,6 +164,7 @@ plot(m1)
 
 ## A similarity test where less than chance successes are obtained:
 discrim(22, 75, method = "triangle", d.prime0 = 1, test = "similarity")
+
 \dontshow{
 ## Testing stability of results:
 fm1 <- discrim(10, 15, method = "twoAFC")

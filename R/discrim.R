@@ -41,7 +41,7 @@ AnotA <-
 discrim <-
   function(correct, total, d.prime0, pd0, conf.level = 0.95,
            method = c("duotrio", "tetrad", "threeAFC", "twoAFC",
-             "triangle"),
+             "triangle"), double = FALSE,
            statistic = c("exact", "likelihood", "score", "Wald"),
            test = c("difference", "similarity"), ...)
 {
@@ -49,6 +49,8 @@ discrim <-
             length(total) == 1L, is.numeric(total),
             length(conf.level) == 1L, is.numeric(conf.level),
             conf.level >= 0, conf.level <= 1)
+  # if(double == TRUE && method == "tetrad")
+  #   stop("The double method for the tetrat test is not implemented. Choose double=FALSE")
   m <- match.call(expand.dots=FALSE)
   method <- match.arg(method)
   test <- match.arg(test)
@@ -67,7 +69,10 @@ discrim <-
   n <- as.integer(round(n))
   if(x > n)
     stop("'correct' cannot be larger than 'total'")
-  Pguess <- pc0 <- ifelse(method %in% c("duotrio", "twoAFC"), 1/2, 1/3)
+  if(double)
+    Pguess <- pc0 <- ifelse(method %in% c("duotrio", "twoAFC"), 1/4, 1/9)
+  else
+    Pguess <- pc0 <- ifelse(method %in% c("duotrio", "twoAFC"), 1/2, 1/3)
   pd0 <- 0 ## Initial default value.
   ## Check value of null hypothesis (pd0/d.prime0):
   null.args <- c("pd0", "d.prime0")
@@ -99,7 +104,7 @@ discrim <-
                     d.prime0 >= 0)
           if(test == "similarity" && d.prime0 == 0)
               warning("'d.prime0' should be positive for a similarity test")
-          pc0 <- psyfun(d.prime0, method=method)
+          pc0 <- psyfun(d.prime0, method=method, double = double)
           pd0 <- pc2pd(pc=pc0, Pguess=Pguess)
       }
   }
@@ -111,12 +116,12 @@ discrim <-
   rownames(table) <- c("pc", "pd", "d-prime")
   colnames(table) <- c("Estimate", "Std. Error", "Lower", "Upper")
   ## Fill in estimates:
-  obj <- rescale(pc = mu, method = method)
+  obj <- rescale(pc = mu, method = method, double = double)
   table[,1] <- unlist(obj$coefficients)
   pc.hat <- table[1,1]
   ## Fill in standard errors:
   if(mu < 1 && mu > Pguess) {
-    obj <- rescale(pc = mu, std.err = se.mu, method = method)
+    obj <- rescale(pc = mu, std.err = se.mu, method = method, double = double)
     table[,2] <- unlist(obj$std.err)
   }
   ## Get p-value, CI and test statistic:
@@ -167,14 +172,14 @@ discrim <-
   }
   if(sum(is.na(ci)) == 0) {
     ci <- delimit(x = ci, lower = 0, upper = 1)
-    intervals <- rescale(pc = ci, method = method)$coefficients
+    intervals <- rescale(pc = ci, method = method, double = double)$coefficients
     table[,3] <- unlist(intervals[1,])
     table[,4] <- unlist(intervals[2,])
   }
   res <- list(coefficients = table, p.value = p.value, call = call,
               test = test, method = method, statistic = stat,
               data = c("correct" = x, "total" = n), pd0 = pd0,
-              conf.level = conf.level, alt.scale = alt.scale)
+              conf.level = conf.level, alt.scale = alt.scale,double=double)
   if(stat != "exact")
     res$stat.value <- Stat
   if(stat == "score")
@@ -182,6 +187,7 @@ discrim <-
   if(stat == "likelihood")
     res$profile <- prof
   class(res) <- "discrim"
+  if (is.na(table[1,2])) message("Standard errors are not estimable due to an observed proportion either at or below guessing level or at 100%. Everything else is still valid.")
   return(res)
 }
 
@@ -293,25 +299,39 @@ print.anota <-
 print.discrim <-
   function(x, digits = max(3, getOption("digits") - 3), ...)
 {
+   # print(x)
   text1 <- switch(x$statistic,
                   "exact" = "'exact' binomial test.",
                   "likelihood" = "likelihood root statistic.",
                   "Wald" = "Wald statistic.",
                   "score" = "Pearson and score statistics.")
-  cat(paste("\nEstimates for the", x$method,
+  cat(if (x$double== TRUE)
+    paste("\nEstimates for the","double",x$method,
             "discrimination protocol with", x$data[1],
             "correct\nanswers in",
             x$data[2], "trials. One-sided p-value and",
             round(100 * x$conf.level, 3),
             "% two-sided confidence\nintervals are based on the",
-            text1, "\n\n"))
+            text1, "\n\n")
+    else
+      paste("\nEstimates for the",x$method,
+            "discrimination protocol with", x$data[1],
+            "correct\nanswers in",
+            x$data[2], "trials. One-sided p-value and",
+            round(100 * x$conf.level, 3),
+            "% two-sided confidence\nintervals are based on the",
+            text1, "\n\n")
+      )
   print(x$coefficients, digits = digits)
-  Pguess <- ifelse(x$method %in% c("duotrio", "twoAFC"), 1/2, 1/3)
-  d.prime0 <- psyinv(pd2pc(x$pd0, Pguess), method = x$method)
+  if(x$double)
+    Pguess <- ifelse(x$method %in% c("duotrio", "twoAFC"), 1/4, 1/9)
+  else
+    Pguess <- ifelse(x$method %in% c("duotrio", "twoAFC"), 1/2, 1/3)
+  d.prime0 <- psyinv(pd2pc(x$pd0, Pguess), method = x$method, double = x$double)
   null.value <- switch(x$alt.scale,
                        "pd" = x$pd0,
                        "d-prime" = psyinv(pd2pc(x$pd0, Pguess),
-                       method=x$method))
+                       method=x$method, double = x$double))
   cat(paste("\nResult of", x$test, "test:\n"))
   if(x$statistic == "Wald")
     cat(paste("Wald statistic = ", format(x$stat.value, digits),
@@ -343,9 +363,8 @@ plot.discrim <-
   z <- seq(-5, 5, length.out = length)
   y <- dnorm(z)
   y2 <- dnorm(z, mean = coef(x)[3, 1])
-  main.txt <- ifelse(main,
-                     paste("Distribution of sensory intensity for the",
-                           x$method, "test"), c("") )
+  main.txt <- ifelse(main,if (x$double== TRUE) paste("Distribution of sensory intensity for the double",x$method, "test")
+                     else paste("Distribution of sensory intensity for the",x$method, "test"), c("") )
   plot(z, y, type="l", xlab = "Sensory Magnitude",
        ylab = "", main = main.txt, las = 1, lty = 2, ...)
   lines(z, y2, col = "red", lty = 1, ...)

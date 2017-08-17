@@ -148,7 +148,7 @@ discrimSS <-
 d.primeSS <- 
   function(d.primeA, d.prime0 = 0, target.power = 0.90, alpha = 0.05,
            method = c("duotrio", "tetrad", "threeAFC", "twoAFC",
-             "triangle"), 
+             "triangle"), double = FALSE, 
            test = c("difference", "similarity"),
            statistic = c("exact", "stable.exact", "both.exact",
              "normal", "cont.normal"))
@@ -161,11 +161,15 @@ d.primeSS <-
             d.primeA >= 0)
   stopifnot(length(d.prime0) == 1 && is.numeric(d.prime0) &&
             d.prime0 >= 0)
-  pdA <- coef(rescale(d.prime = d.primeA, method = method))$pd
-  pd0 <- coef(rescale(d.prime = d.prime0, method = method))$pd
-  newCall$method <- newCall$d.primeA <- newCall$d.prime0 <- NULL
-  newCall$pGuess <-
-    ifelse(method %in% c("duotrio", "twoAFC"), 1/2, 1/3)
+  # if(double == TRUE && method == "tetrad")
+  #   stop("The double method for the tetrat test is not implemented. Choose double=FALSE")
+  pdA <- coef(rescale(d.prime = d.primeA, method = method, double = double))$pd
+  pd0 <- coef(rescale(d.prime = d.prime0, method = method, double = double))$pd
+  newCall$method <- newCall$d.primeA <- newCall$d.prime0 <-newCall$double<- NULL
+  if (double)
+    newCall$pGuess <- ifelse(method %in% c("duotrio", "twoAFC"), 1/4, 1/9)
+  else
+    newCall$pGuess <- ifelse(method %in% c("duotrio", "twoAFC"), 1/2, 1/3)
   newCall$pdA <- pdA
   newCall$pd0 <- pd0
   newCall[[1]] <- as.name("discrimSS")
