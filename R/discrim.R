@@ -179,7 +179,7 @@ discrim <-
   res <- list(coefficients = table, p.value = p.value, call = call,
               test = test, method = method, statistic = stat,
               data = c("correct" = x, "total" = n), pd0 = pd0,
-              conf.level = conf.level, alt.scale = alt.scale,double=double)
+              conf.level = conf.level, alt.scale = alt.scale, double = double)
   if(stat != "exact")
     res$stat.value <- Stat
   if(stat == "score")
