@@ -7,9 +7,10 @@ para <- data.frame( a = rep(c(0.3,1,3,2,4), 8),
                     n = c(rep( c(rep(12, 5), rep(18, 5), rep(30, 5), rep(100, 5)), 2)),
                     k = c(rep( c(rep(4, 5), rep(12, 5), rep(10, 5), rep(3, 5)), 2)) )
 #load sensR package
-library(sensR)
+# library(sensR)
 #number of simulated points for each parameter set
-N <- 10000
+N <- 10# 000
+# j <- 1
 for (j in 1:40){ #for each parameter set
   #set random seed
   set.seed(123)
@@ -44,7 +45,7 @@ for (j in 1:40){ #for each parameter set
   simdat$wald.mu.95.bool <- NA
   simdat$wald.gamma.95.bool <- NA
   simdat$wald.mugamma.bool <- NA
-  for (i in 1:N){
+  for (i in 1:N){ # i <- 1
     #keep track of the progress
     print(i)
     #simulate probabilities
@@ -81,18 +82,25 @@ for (j in 1:40){ #for each parameter set
       simdat$loglik.true.gamma[i] <- optimize(f = loglikcbb.gamma, interval = c(0,1), gamma = gamma,
                                               y = y, k = k, p0 = p0)$objective #for true gamma
       #threshold value for the profile likelihood
-      loglik_bound1 <- optim_result$lik + qchisq(0.95, 1)/2
+      ### RHBC: I changed this to make it run assuming that we do not need to 
+      ### change the sign:
+      # loglik_bound1 <- optim_result$lik + qchisq(0.95, 1)/2
+      loglik_bound1 <- optim_result$neg.loglik + qchisq(0.95, 1)/2
       #profile mu and gamma
+      ### RHBC: this values is also assigned to simdat$loglik.true.mu[i] above - 
+      ### is that intended?
       lik_mu <- optimize(f = loglikcbb.mu, interval = c(0,1), mu = mu,
                          y = y, k = k, p0 = p0)$objective
       lik_gamma <- optimize(f = loglikcbb.gamma, interval = c(0,1), gamma = gamma,
                             y = y, k = k, p0 = p0)$objective
       #check if true points are inside confidence intervals
+      ### RHBC: I think I understand the logic here but I haven't thought it throught:
       simdat$prof.mu.bool[i] <- (lik_mu < loglik_bound1)
       simdat$prof.gamma.bool[i] <- (lik_gamma < loglik_bound1)
     }
     #fit the betabin from sensR
     responses <- cbind(y, rep(k,n))
+    ### RHBC: should it be fit1 <- NULL instead? why assign NA?
     fit1 <- NA
     #try to use betabin function
     if (p0 == 1/2){
@@ -100,6 +108,7 @@ for (j in 1:40){ #for each parameter set
     } else{
       try( fit1 <- betabin(responses, method = "triangle"), silent = T )
     }
+    ### RHBC: Note that optim_result differ from c(coef(fit1), logLik(fit1))
     #record errors
     simdat$wald.error[i] <- (length(fit1) == 1) #check if it is NA, because it failed
     if (!is.na(fit1)){
@@ -120,3 +129,4 @@ for (j in 1:40){ #for each parameter set
   #save the data frame
   write.csv(simdat, file = filename, row.names = FALSE)
 } #end of the parameter loop 1:40
+
