@@ -1,0 +1,172 @@
+---
+title: "CBB likelihood contours"
+author: "Rune Haubo B Christensen @ Christensen Statistics"
+date: "17 May 2018"
+output: 
+  html_document:
+    keep_md: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+While tweaking Karolina's code to make it run, I noticed that Karolina's `optimcbb` and `betabin` didn't give the same answers on the first set of simulated data, so I thought I'd look a bit more.
+
+First, gain access to Karolina's functions:
+```{r}
+# library(devtools)
+# pkgpath <- "~/GitHub/sensR/sensR" # Adjust path to YOUR location
+# load_all(pkgpath)
+
+# Alternatively use:
+# install.packages("devtools")
+# devtools::install_github("runehaubo/sensR", ref="cbb-profile")
+library(sensR)
+```
+
+Get parameters for the datasets considered in chapter 7 in the thesis:
+```{r}
+para <- data.frame( a = rep(c(0.3,1,3,2,4), 8),
+                    b = rep(c(2.7,2,6,2,0.5), 8),
+                    p0 = c(rep(1/3, 20), rep(1/2, 20)),
+                    n = c(rep( c(rep(12, 5), rep(18, 5), rep(30, 5), rep(100, 5)), 2)),
+                    k = c(rep( c(rep(4, 5), rep(12, 5), rep(10, 5), rep(3, 5)), 2)) )
+```
+
+Here the first parameter set reads:
+```{r}
+# get parameters
+j <- 1
+a <- para$a[j]
+b <- para$b[j]
+p0 <- para$p0[j]
+n <- para$n[j]
+k <- para$k[j]
+mu <- a/(a+b)
+gamma <- 1/(a+b+1)
+
+c(a=a, b=b, p0=p0, n=n, k=k, mu=mu, gamma=gamma)
+```
+
+Simulations are done with the following seed:
+```{r}
+# simulate responses:
+set.seed(123)
+sim_pd <- rbeta(n, a, b)
+sim_pc <- p0 + (1-p0) * sim_pd
+y <- rbinom(n = rep(1, n), size = rep(k, n), prob = sim_pc)
+response <- cbind(y, rep(k, n))
+```
+
+Fit the model using Karolina's `optimcbb` as well as `betabin`: 
+```{r}
+(fm_karo <- optimcbb(y, k, p0))
+fm1 <- betabin(response, method="threeAFC", corrected = TRUE)
+summary(fm1) # different from fm_karo
+```
+
+Note that the value of the log-likelihood as well as the parameters are different. The difference in the log-likelihood value could very well just be because she has left out a constant term, but the difference in the parameter values is more serious.
+
+We can look at the contours of the likelihood function as it is implemented in `sensR::betabin` and Karolina's `loglikcbb`:
+```{r, fig.asp=1, out.width='48%', fig.width=5, fig.show='hold'}
+fm_env <- update(fm1, doFit=FALSE) # get model environment
+# Display contours of the likelihood surface:
+# Compute the negative log-lik at grid of values for mu and gamma:
+muvec <- gammavec <- seq(0.01, .99, .01)
+pardf <- expand.grid(mu=muvec, gamma=gammavec)
+# head(pardf)
+# str(pardf)
+
+# implementation in sensR:
+nllvec <- sapply(1:nrow(pardf), function(i) 
+  sensR:::setParBB(fm_env, par=as.vector(unlist(pardf[i, ]))))
+Z <- matrix(nllvec, ncol=length(gammavec))
+# Plot the likelihood contours:
+contour(muvec, gammavec, Z, xlim=c(0, 1), ylim=c(0, 1), ylab="gamma", xlab="mu", 
+        main="betabin", las=1)
+points(x=coef(fm1)[1], y=coef(fm1)[2], pch="+", col="red")
+points(x=fm_karo[["mu"]], y=fm_karo[["gamma"]], pch="o", col="blue")
+
+# Karolina's implementation:
+nllvec <- sapply(1:nrow(pardf), function(i) 
+  loglikcbb(as.vector(unlist(pardf[i, ])), y, k, p0))
+Z <- matrix(nllvec, ncol=length(gammavec))
+# Plot the likelihood contours:
+contour(muvec, gammavec, Z, xlim=c(0, 1), ylim=c(0, 1), ylab="gamma", xlab="mu", 
+        main="Karolina", las=1)
+points(x=coef(fm1)[1], y=coef(fm1)[2], pch="+", col="red")
+points(x=fm_karo[["mu"]], y=fm_karo[["gamma"]], pch="o", col="blue")
+```
+
+These contours seem to have an overall similar shape. The red cross is the estimate from `betabin` and the blue circle is the estimate from `optimcbb`.
+
+As described in `help(betabin)` the functions `setParBB` and `getParBB` can be used to compute on the likelihood for a particular setting using the model environment returned by use of the `doFit=FALSE` argument.
+
+We can now close in and look at the shapes of the likelihood functions in the two implementations around the two estimates:
+```{r, fig.asp=1, out.width='48%', fig.width=5, fig.show="hold"}
+# Closing in: 
+muvec <- seq(0.001, 0.05, length.out = 101)
+gammavec <- seq(0.001, 0.01, length.out = 101)
+pardf <- expand.grid(mu=muvec, gamma=gammavec)
+nllvec <- sapply(1:nrow(pardf), function(i) {
+  sensR:::setParBB(fm_env, par=as.vector(unlist(pardf[i, ])))
+})
+Z <- matrix(nllvec, ncol=length(gammavec))
+contour(muvec, gammavec, Z, ylab="gamma", xlab="mu", main="betabin", las=1)
+points(x=coef(fm1)[1], y=coef(fm1)[2], pch="+", col="red")
+points(x=fm_karo[["mu"]], y=fm_karo[["gamma"]], pch="o", col="blue")
+
+# Karolina's implementation:
+nllvec <- sapply(1:nrow(pardf), function(i) 
+  loglikcbb(as.vector(unlist(pardf[i, ])), y, k, p0))
+Z <- matrix(nllvec, ncol=length(gammavec))
+# Plot the likelihood contours:
+contour(muvec, gammavec, Z, ylab="gamma", xlab="mu", 
+        main="Karolina", las=1)
+points(x=coef(fm1)[1], y=coef(fm1)[2], pch="+", col="red")
+points(x=fm_karo[["mu"]], y=fm_karo[["gamma"]], pch="o", col="blue")
+
+# Closing in on the optimcbb estimate:
+muvec <- seq(0.001, 0.01, length.out = 101)
+gammavec <- seq(0.62, 0.623, length.out = 101)
+pardf <- expand.grid(mu=muvec, gamma=gammavec)
+nllvec <- sapply(1:nrow(pardf), function(i) {
+  sensR:::setParBB(fm_env, par=as.vector(unlist(pardf[i, ])))
+})
+Z <- matrix(nllvec, ncol=length(gammavec))
+contour(muvec, gammavec, Z, ylab="gamma", xlab="mu", main="betabin", las=1,
+        xlim=c(0, .01))
+points(x=coef(fm1)[1], y=coef(fm1)[2], pch="+", col="red")
+points(x=fm_karo[["mu"]], y=fm_karo[["gamma"]], pch="o", col="blue")
+
+# Karolina's implementation:
+nllvec <- sapply(1:nrow(pardf), function(i) 
+  loglikcbb(as.vector(unlist(pardf[i, ])), y, k, p0))
+Z <- matrix(nllvec, ncol=length(gammavec))
+# Plot the likelihood contours:
+contour(muvec, gammavec, Z, ylab="gamma", xlab="mu", 
+        main="Karolina", las=1, xlim=c(0, .01))
+points(x=coef(fm1)[1], y=coef(fm1)[2], pch="+", col="red")
+points(x=fm_karo[["mu"]], y=fm_karo[["gamma"]], pch="o", col="blue")
+```
+
+This confirms that:
+
+1. the estimate for `optimcbb` is wrong
+1. the two likelihood functions/implementations appear to have the same optimum
+1. `betabin` is successfull in locating the optimum. 
+
+At this point I'm not too confident in the results in Karolina's thesis - at least not when it comes to the simulations in chapter 7. We should probably re-run the simulations an pay close attention to the convergence properties of the model fits.
+
+I'd be more inclined to base profile likelihood intervals on the existing implementation in sensR but maybe that also needs to be scrutinized before we use it for simulations...
+
+<!-- A similar exercise could be performed using `optimcbb` to confirm if it is the optimization that is faulty or if there are genuine differences in the implementation of the likelihood function for the chance-corrected beta-binomial model. -->
+
+Session Info for potential debug'ing:
+```{r}
+sessionInfo()
+```
+
