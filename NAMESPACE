@@ -29,6 +29,14 @@ export(AnotA, discrimPwr, discrimSS, discrim, #discrimr,
        dod, dod_fit, dodControl, dodSim, dodPwr, optimal_tau,
        par2prob_dod, dod_nll, dod_null, dod_null_tau)
 
+######
+# Karolina's CBB functions:
+export(cbb, loglikcbb, optimcbb, plotcbb, profilecbb, loglikcbb.gamma, 
+       loglikcbb.mu)
+importFrom("graphics", "layout", "legend", "points")
+importFrom("stats", "runif")
+######
+
 S3method(print, dod)
 S3method(confint, dod_fit)
 

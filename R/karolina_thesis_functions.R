@@ -1,11 +1,29 @@
 # karolina_thesis_functions.R - Functions from Karolina Stachlewska's master 
 # thesis, appendix E.
 
+#' Likelihood function for the chance-corrected beta-binomial model
+#'
+#' @param a parameter
+#' @param b parameter
+#' @param x number of correct responses
+#' @param k number of replications
+#' @param p0 guessing probability
+#'
+#' @rdname cbb
+#' @export
 cbb <- function(a, b, x, k, p0){
   (1 - p0) / beta(a,b) * choose(k, x) *
     sum( sapply( c(0:x), function(i){ choose(x,i) * (p0/(1 - p0))^(x-i) * beta(a+i, k+b-x) } ) )
 }
 
+#' Likelihood function for the chance-corrected beta-binomial model
+#'
+#' @param parameters mu and gamma parameter vector
+#' @param y vector of correct answers
+#' @param k number of replications
+#' @param p0 guessing probability
+#'
+#' @export
 loglikcbb <- function(parameters, y, k, p0){
   mu <- parameters[1]
   gamma <- parameters[2]
@@ -18,6 +36,15 @@ loglikcbb <- function(parameters, y, k, p0){
   - sum( sapply(y, function(j){ log( cbb(a, b, j, k, p0) ) } ) )
 }
 
+#' Optimize the chance-corrected beta-binomial likelihood
+#'
+#' @param y vector of correct answers
+#' @param k number of replications
+#' @param p0 guessing probability
+#' @param init vector of initial parameters
+#' @param max.try maximum number of re-tries
+#'
+#' @export
 optimcbb <- function(y, k, p0, init = c(0.5,0.2), max.try = 2){
   #check the arguments
   stopifnot(all(y%%1 == 0), all(y >=0), all(y <= k), p0 < 1, p0 > 0, max.try >= 0)
@@ -54,6 +81,19 @@ optimcbb <- function(y, k, p0, init = c(0.5,0.2), max.try = 2){
   }
   }
 
+
+#' Plot likelihood confidence region for mu and gamma
+#'
+#' @param y vector of correct answers
+#' @param k number of replications
+#' @param p0 guessing probability
+#' @param init vector of initial parameters
+#' @param max.try maximum number of re-tries
+#' @param level confidence level
+#' @param length.out number of grid points at each axis 
+#' @param p df for the chi-square approximation (between 1 and 2)
+#'
+#' @export
 plotcbb <- function(y, k, p0, level = 0.95, length.out = 101, p = 2, init = c(0.5,0.2), max.try = 2){
   #check the arguments
   stopifnot(level < 1, level > 0, length.out > 2, (p >= 1 & p <= 2))
@@ -99,6 +139,10 @@ plotcbb <- function(y, k, p0, level = 0.95, length.out = 101, p = 2, init = c(0.
   return(thelist)
 }
 
+#' @rdname cbb
+#' @param mu mu parameter
+#' @param gamma gamma parameter
+#' @param y vector of correct answers
 loglikcbb.gamma <- function(mu, gamma, y, k, p0){ #to optimize with respect to mu
   #points outside the parameter space
   if (mu >= 1 || mu <= 0 || gamma >= 1 || gamma <= 0) return(Inf)
@@ -109,6 +153,7 @@ loglikcbb.gamma <- function(mu, gamma, y, k, p0){ #to optimize with respect to m
   - sum( sapply(y, function(j){ log( cbb(a, b, j, k, p0) ) } ) )
 }
 
+#' @rdname cbb
 loglikcbb.mu <- function(gamma, mu, y, k, p0){ #to optimize with respect to gamma
   #points outside the parameter space
   if (gamma >= 1 || gamma <= 0 || mu >= 1 || mu <= 0) return(Inf)
@@ -119,6 +164,18 @@ loglikcbb.mu <- function(gamma, mu, y, k, p0){ #to optimize with respect to gamm
   - sum( sapply(y, function(j){ log( cbb(a, b, j, k, p0) ) } ) )
 }
 
+#' Profile CBB likelihood function
+#'
+#' @param y vector of correct answers
+#' @param k number of replications
+#' @param p0 guessing probability
+#' @param init vector of initial parameters
+#' @param max.try maximum number of re-tries
+#' @param level confidence level
+#' @param length.out number of grid points at each axis 
+#' @param plot.profile logical; plot the profile likelihoods?
+#'
+#' @export
 profilecbb <- function(y, k, p0, plot.profile = TRUE, level = 0.95,
                        length.out = 101, init = c(0.5,0.2), max.try = 2){
   #check the arguments
