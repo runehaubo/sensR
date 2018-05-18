@@ -1,0 +1,138 @@
+---
+title: "CBB simulations"
+author: "Rune Haubo B Christensen @ Christensen Statistics"
+date: "18 May 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(sensR)
+library(ggplot2)
+namedList <- function(...) {
+    setNames(list(...), nm=sapply(as.list(match.call()), deparse)[-1])
+}
+rbindall <- function(...) do.call(rbind, ...)
+```
+
+```{r}
+n <- 12 # no. assessors
+k <- 4  # no. replications per assessor
+nsim <- 500
+p0 <- 1/3
+set.seed(123)
+data_list <- lapply(1:nsim, function(i) {
+  mu <- runif(1)
+  gamma <- runif(1)
+  a <- mu * (1/gamma - 1)
+  b <- (1 - mu) * (1/gamma - 1)
+  sim_pd <- rbeta(n, a, b)
+  sim_pc <- p0 + (1-p0) * sim_pd
+  y <- rbinom(n = rep(1, n), size = rep(k, n), prob = sim_pc)
+  response <- cbind(y, rep(k, n))
+  namedList(mu, gamma, sim_pd, sim_pc, y, response)
+})
+```
+
+Fit `betabin` and `cbb` models:
+```{r fit_models, cache=TRUE, warning=FALSE}
+betabin_fits <- lapply(data_list, function(x) 
+  try(betabin(x$response, method = "threeAFC", 
+              corrected = TRUE, vcov = FALSE), silent = TRUE))
+cbb_fits <- lapply(data_list, function(x) 
+  try(optimcbb(x$y, k = k, p0 = 1/3), silent=TRUE))
+```
+
+```{r}
+# str(betabin_fits[[1]])
+any(sapply(betabin_fits, class) == "try-error")
+conv_betabin <- sapply(betabin_fits, "[[", "convergence")
+
+# str(cbb_fits[[1]])
+any(sapply(cbb_fits, class) == "try-error")
+conv_cbb <- sapply(cbb_fits, "[[", "conv")
+
+# convergence indicator:
+conv_fail <- rep("none", nsim)
+conv_fail[conv_betabin > 0] <- "betabin"
+conv_fail[!conv_cbb] <- "cbb"
+conv_fail[conv_betabin > 0 %% !conv_cbb] <- "both"
+```
+
+Compare parameter estimates:
+```{r}
+parmat_betabin <- rbindall(lapply(betabin_fits, coef))
+parmat_cbb <- rbindall(lapply(cbb_fits, function(x) unlist(x[c("mu", "gamma")])))
+
+estimates <- data.frame(betabin=c(parmat_betabin),
+                        cbb=c(parmat_cbb),
+                        parameter=rep(c("mu", "gamma"), each=nrow(parmat_cbb)),
+                        conv_fail=c(conv_fail, conv_fail))
+estimates$agree_1e3 <- abs(estimates$betabin - estimates$cbb) <= 1e-3
+ggplot(estimates, aes(betabin, cbb, color=agree_1e3, shape=conv_fail)) + 
+  geom_point() + facet_wrap(~parameter)
+```
+
+Color and shape of symbols indicate agreement of parameter estimates to a tolerance of `1e-3` and optimizer reported convergence indicator respectively.
+
+Note that `betabin` and `optimcbb` use different optimizers and it is the convergence code from these optimizers which is shown here. The optimizer in `betabin` (`L-BFGS-B`) declares non-convergence more often than the one in `optimcbb` (`Nelder-Mead`) which on these 500 cases never declares anything but successful convergence. It seems that `L-BFGS-B` may be a bit over-cautious given the number of cases where the parameter estimates from the two optimizers agree, while `Nelder-Mead` declares convergence even when it (presumably) fails to converge (which may _also_ be true for `L-BFGS-B`). 
+
+Note the problematic situation around $\gamma = 0.62$ for the `optimcbb` fits. It is unclear if `optimcbb` or `betabin` has a problem here. 
+
+Compare likelihoods:
+```{r}
+cbb_nll <- sapply(cbb_fits, "[[", "neg.loglik")
+betabin_nll <- -sapply(betabin_fits, logLik)
+parm_agree_1e3 <- sapply(1:nrow(parmat_cbb), function(i) 
+  all(abs(parmat_betabin[i, ] - parmat_cbb[i, ]) < 1e-3))
+
+nlldf <- data.frame(cbb=cbb_nll, betabin=betabin_nll,
+                    parm_agree_1e3,
+                    conv_fail)
+ggplot(nlldf, aes(cbb, betabin, color=parm_agree_1e3, shape=conv_fail)) + 
+  geom_point()
+```
+
+The two implementations agree on the calculation of the log-likelihood apart from a constant term. Also note that the log-likelihoods agree even in cases when the parameter estimates do not - this indicates that the problem is optimizing the likelihood function when it is very flat wrt. the parameters. 
+
+Look at the _true_ parameter values (i.e. the values from which the parameters of the beta-distribution for $p_d$ are drawn):
+```{r}
+# dev.new()
+mugamma <- as.data.frame(rbindall(lapply(data_list, function(l) 
+  unlist(l[c("mu", "gamma")]))))
+mugamma$parm_agree_1e3 <- parm_agree_1e3
+mugamma$conv_fail <- conv_fail
+# str(mugamma)
+ggplot(mugamma, aes(x=mu, y=gamma, color=parm_agree_1e3, shape=conv_fail)) + 
+  geom_point() + xlim(0,1) + ylim(0,1)
+```
+
+This indicates that `betabin` often declares non-convergence for $\mu$ near 1 and that disagreement in parameter estimates is often seen for $\mu$ near its boundaries at 0 and 1, but also when both $\gamma$ and $\mu$ are small.
+
+Surprisingly $\gamma$ values near 0 and 1 are no problem unless $\mu$ is also near 0 or 1. 
+
+Tabulate parameter agreement by convergence status:
+```{r}
+addmargins(tab <- with(mugamma, table(parm_agree_1e3, conv_fail)))
+```
+Same in percent:
+```{r}
+addmargins(prop.table(tab)*100)
+```
+
+```{r, eval=FALSE, include=FALSE}
+subset(mugamma, !parm_agree_1e3 & conv_fail == "betabin")
+subset(mugamma, parm_agree_1e3 & conv_fail == "betabin")
+
+subset(estimates, !agree_1e3 & conv_fail == "betabin")
+subset(estimates, agree_1e3 & conv_fail == "betabin")
+
+head(estimates)
+```
+
+
