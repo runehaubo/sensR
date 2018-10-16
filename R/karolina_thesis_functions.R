@@ -12,7 +12,7 @@
 #' @rdname cbb
 #' @export
 cbb <- function(a, b, x, k, p0){
-  (1 - p0) / beta(a,b) * choose(k, x) *
+  ((1 - p0)^k) / beta(a,b) * choose(k, x) *
     sum( sapply( c(0:x), function(i){ choose(x,i) * (p0/(1 - p0))^(x-i) * beta(a+i, k+b-x) } ) )
 }
 
@@ -55,6 +55,8 @@ optimcbb <- function(y, k, p0, init = c(0.5,0.2), max.try = 2){
             \nChanging to default: (0.5,0.2)")
   }
   #optimize
+  bbRho <- bbEnvir(parent.frame(), X = as.matrix(cbind(y, k)), 
+                   corrected = TRUE, pGuess = p0, start = init)
   result <- NA
   i <- 0
   while ( i <= max.try && (is.na(result[1]) || result$convergence != 0) ){
@@ -64,8 +66,11 @@ optimcbb <- function(y, k, p0, init = c(0.5,0.2), max.try = 2){
                     \nChanging initial values to randomly generated: (",
                     init[1], ", ", init[2], ")", sep = ""))
     }
-    suppressWarnings(try( result <- optim(par = init, fn = loglikcbb, y = y, k = k, p0 = p0),
-                          silent = T ))
+    suppressWarnings(try(
+      result <- optim(par = init, fn = loglikcbb, 
+                      y = y, k = k, p0 = p0, method = "L-BFGS-B", hessian = FALSE, 
+                      lower = bbRho$lbounds, upper = bbRho$ubounds, 
+                      control = list(parscale = c(0.01, 0.01))), silent = TRUE))
     i <- i + 1
   }
   #display results
